@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VC Capture">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <title>VC Capture — Business Card Scanner</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>VC Capture</h1>
+            <p class="subtitle">Business Card Scanner</p>
+        </header>
+
+        <!-- API Key Setup -->
+        <section id="api-key-section" class="card">
+            <h2>Setup</h2>
+            <p>Enter your <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google Gemini API key</a> to get started.</p>
+            <div class="input-group">
+                <input type="password" id="api-key-input" placeholder="Paste your Gemini API key" autocomplete="off">
+                <button id="save-key-btn" class="btn btn-primary">Save</button>
+            </div>
+            <p id="key-status" class="status-msg hidden"></p>
+        </section>
+
+        <!-- Capture Section -->
+        <section id="capture-section" class="card hidden">
+            <h2>Scan a Business Card</h2>
+            <div class="capture-buttons">
+                <label class="btn btn-primary btn-large" id="camera-btn-label">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    Take Photo
+                    <input type="file" id="camera-input" accept="image/*" capture="environment" hidden>
+                </label>
+                <label class="btn btn-secondary btn-large" id="upload-btn-label">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Upload Image
+                    <input type="file" id="upload-input" accept="image/*" hidden>
+                </label>
+            </div>
+
+            <!-- Image Preview -->
+            <div id="preview-container" class="hidden">
+                <img id="image-preview" alt="Business card preview">
+                <button id="extract-btn" class="btn btn-primary btn-large btn-full">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    Extract Details
+                </button>
+            </div>
+        </section>
+
+        <!-- Loading -->
+        <section id="loading-section" class="card hidden">
+            <div class="spinner"></div>
+            <p>Analyzing business card with AI...</p>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="card hidden">
+            <h2>Extracted Details</h2>
+            <p class="hint">Review and edit the fields below, then download the contact.</p>
+
+            <form id="contact-form">
+                <div class="form-group">
+                    <label for="field-prefix">Prefix</label>
+                    <input type="text" id="field-prefix" placeholder="e.g. Mr., Dr.">
+                </div>
+                <div class="form-group">
+                    <label for="field-firstName">First Name</label>
+                    <input type="text" id="field-firstName" placeholder="First name">
+                </div>
+                <div class="form-group">
+                    <label for="field-lastName">Last Name</label>
+                    <input type="text" id="field-lastName" placeholder="Last name">
+                </div>
+                <div class="form-group">
+                    <label for="field-title">Job Title</label>
+                    <input type="text" id="field-title" placeholder="Job title / position">
+                </div>
+                <div class="form-group">
+                    <label for="field-company">Company</label>
+                    <input type="text" id="field-company" placeholder="Company / organization">
+                </div>
+                <div class="form-group">
+                    <label for="field-email">Email</label>
+                    <input type="email" id="field-email" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="field-phone">Phone</label>
+                    <input type="tel" id="field-phone" placeholder="+1 (555) 123-4567">
+                </div>
+                <div class="form-group">
+                    <label for="field-mobile">Mobile</label>
+                    <input type="tel" id="field-mobile" placeholder="+1 (555) 987-6543">
+                </div>
+                <div class="form-group">
+                    <label for="field-website">Website</label>
+                    <input type="url" id="field-website" placeholder="https://example.com">
+                </div>
+                <div class="form-group">
+                    <label for="field-address">Address</label>
+                    <textarea id="field-address" rows="2" placeholder="Street, City, State, ZIP"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="field-linkedin">LinkedIn</label>
+                    <input type="url" id="field-linkedin" placeholder="https://linkedin.com/in/...">
+                </div>
+                <div class="form-group">
+                    <label for="field-notes">Notes</label>
+                    <textarea id="field-notes" rows="2" placeholder="Additional notes"></textarea>
+                </div>
+            </form>
+
+            <div class="action-buttons">
+                <button id="download-vcf-btn" class="btn btn-primary btn-large btn-full">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download vCard (.vcf)
+                </button>
+                <button id="scan-another-btn" class="btn btn-secondary btn-large btn-full">
+                    Scan Another Card
+                </button>
+            </div>
+        </section>
+
+        <!-- No Data Found -->
+        <section id="no-data-section" class="card hidden">
+            <div class="no-data-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <h2>No Contact Found</h2>
+            <p>Could not extract contact details from this image. Please try again with a clearer photo of a business card.</p>
+            <button id="retry-btn" class="btn btn-primary btn-large btn-full">Try Again</button>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
+        }
+    </script>
+</body>
+</html>
