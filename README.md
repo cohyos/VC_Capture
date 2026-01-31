@@ -1,6 +1,6 @@
 # VC Capture — Business Card Scanner
 
-A Progressive Web App (PWA) that scans business cards using your iPhone camera and extracts contact details with Google Gemini AI. Review and edit the results, then download a `.vcf` vCard file you can import directly into your Contacts app.
+A business card scanner app that uses Google Gemini AI to extract contact details from photos. Available as a PWA (web) and as a native iOS app via Capacitor.
 
 ## Features
 
@@ -8,82 +8,121 @@ A Progressive Web App (PWA) that scans business cards using your iPhone camera a
 - **AI-powered extraction** using Google Gemini 2.0 Flash (vision model)
 - **Editable results** — review and correct extracted fields before saving
 - **vCard (.vcf) export** — downloads a standard vCard file importable into iOS Contacts, Android, Outlook, etc.
-- **PWA installable** — add to iPhone home screen for app-like experience
-- **Offline shell** — cached assets via service worker
+- **Native iOS app** — built with Capacitor, uses native camera and iOS share sheet for "Add to Contacts"
+- **PWA installable** — also works as a web app, add to iPhone home screen
 - **Dark theme** — modern, mobile-first UI optimized for iPhone
 
-## Setup
+## Quick Start (Web / PWA)
 
 ### 1. Get a Gemini API Key
 
 1. Go to [Google AI Studio](https://aistudio.google.com/apikey)
 2. Create a free API key
-3. The free tier includes generous usage limits for Gemini Flash
 
-### 2. Host the App
+### 2. Run Locally
 
-The app is static HTML/CSS/JS — no build step required. You can serve it with any static file server:
-
-**Local development:**
 ```bash
 # Python
 python3 -m http.server 8080
 
-# Node.js (npx)
+# or Node.js
 npx serve .
-
-# PHP
-php -S localhost:8080
 ```
 
-Then open `http://localhost:8080` in your browser.
-
-**For iPhone access**, you need HTTPS (required for camera access and PWA features). Options:
-
-- **GitHub Pages** — push to a `gh-pages` branch
-- **Netlify / Vercel** — drag and drop the folder
-- **ngrok** — `ngrok http 8080` for quick HTTPS tunneling during development
+Open `http://localhost:8080` in your browser.
 
 ### 3. Use the App
 
-1. Open the app URL on your iPhone in Safari
-2. Enter your Gemini API key (saved locally in your browser)
-3. Tap **Take Photo** to capture a business card, or **Upload Image** to select from your gallery
-4. Tap **Extract Details** — the AI analyzes the card
-5. Review and edit the extracted fields
-6. Tap **Download vCard (.vcf)** — iOS will prompt you to add the contact
+1. Enter your Gemini API key (saved locally in your browser)
+2. Tap **Take Photo** or **Upload Image**
+3. Tap **Extract Details**
+4. Review and edit the extracted fields
+5. Tap **Download vCard (.vcf)**
 
-### 4. Install as PWA (Optional)
+## Native iOS App (Capacitor)
 
-On iPhone Safari:
-1. Tap the **Share** button (square with arrow)
-2. Select **Add to Home Screen**
-3. The app will appear as a native-looking icon on your home screen
+### Prerequisites
+
+- **macOS** with [Xcode](https://developer.apple.com/xcode/) installed (15.0+)
+- **Node.js** 18+
+- **CocoaPods** (`sudo gem install cocoapods`)
+- **Apple Developer Account** ($99/year, required for device deployment and App Store)
+
+### Build Steps
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Copy web assets and sync with iOS project
+npm run cap:sync
+
+# 3. Open in Xcode
+npm run cap:open
+```
+
+### In Xcode
+
+1. Select your **Team** in Signing & Capabilities (requires Apple Developer account)
+2. Set the **Bundle Identifier** to something unique (e.g., `com.yourname.vccapture`)
+3. Select your connected iPhone or a simulator as the build target
+4. Click **Run** (Cmd+R)
+
+### Native Features (iOS only)
+
+When running as a native app, VC Capture uses:
+
+| Feature | Native Plugin | Behavior |
+|---------|--------------|----------|
+| Camera | `@capacitor/camera` | Native iOS camera UI with permissions |
+| Photo Library | `@capacitor/camera` | Native iOS photo picker |
+| Save Contact | `@capacitor/share` + `@capacitor/filesystem` | Writes .vcf to temp file, opens iOS share sheet which shows "Add to Contacts" |
+
+When running as a PWA (web), it falls back to HTML file inputs and blob download.
+
+### Updating After Code Changes
+
+After editing `index.html`, `app.js`, `styles.css`, or other web files:
+
+```bash
+npm run cap:sync    # copies web assets to iOS project
+```
+
+Then rebuild in Xcode.
 
 ## File Structure
 
 ```
 VC_Capture/
-├── index.html          # Main HTML page
-├── styles.css          # Mobile-first dark theme styles
-├── app.js              # Application logic (capture, API, vCard)
-├── sw.js               # Service worker for offline caching
-├── manifest.json       # PWA manifest
+├── index.html              # Main HTML page
+├── app.js                  # Application logic (capture, API, vCard, native bridge)
+├── styles.css              # Mobile-first dark theme styles
+├── sw.js                   # Service worker for offline caching
+├── manifest.json           # PWA manifest
+├── capacitor.config.json   # Capacitor configuration
+├── package.json            # Node dependencies and scripts
 ├── icons/
-│   ├── icon-192.png    # PWA icon 192x192
-│   └── icon-512.png    # PWA icon 512x512
+│   ├── icon-192.png        # App icon 192x192
+│   └── icon-512.png        # App icon 512x512
+├── www/                    # Built web assets (copied by npm run build)
+├── ios/                    # Native iOS Xcode project (generated by Capacitor)
+│   └── App/
+│       ├── App/
+│       │   ├── Info.plist  # iOS permissions (camera, photos, contacts)
+│       │   └── public/     # Web assets served in WebView
+│       └── App.xcodeproj
 └── README.md
 ```
 
 ## Technology
 
 - **Frontend**: Vanilla HTML/CSS/JavaScript (no frameworks, no build step)
-- **AI**: Google Gemini 2.0 Flash via REST API (client-side calls)
+- **AI**: Google Gemini 2.0 Flash via REST API
+- **Native**: Capacitor 8 with Camera, Filesystem, and Share plugins
 - **Output**: vCard 3.0 format (.vcf)
-- **PWA**: Web App Manifest + Service Worker
 
 ## Privacy
 
-- Your Gemini API key is stored only in your browser's localStorage
+- Your Gemini API key is stored only in your browser/app's local storage
 - Images are sent directly from your device to Google's Gemini API
 - No data is stored on any server — everything runs client-side

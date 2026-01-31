@@ -1,0 +1,17 @@
+{
+  "appId": "io.github.cohyos.vccapture",
+  "appName": "VC Capture",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "Camera": {
+      "permissions": ["camera", "photos"]
+    }
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "allowsLinkPreview": false
+  }
+}

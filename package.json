@@ -1,0 +1,27 @@
+{
+  "name": "vc_capture",
+  "version": "1.0.0",
+  "description": "A Progressive Web App (PWA) that scans business cards using your iPhone camera and extracts contact details with Google Gemini AI. Review and edit the results, then download a `.vcf` vCard file you can import directly into your Contacts app.",
+  "main": "app.js",
+  "scripts": {
+    "build": "cp index.html app.js styles.css manifest.json sw.js .nojekyll www/ && cp -r icons www/",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:open": "npx cap open ios",
+    "test": "echo \"No tests\" && exit 0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:58319/git/cohyos/VC_Capture"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/camera": "^8.0.0",
+    "@capacitor/cli": "^8.0.2",
+    "@capacitor/core": "^8.0.2",
+    "@capacitor/filesystem": "^8.1.0",
+    "@capacitor/ios": "^8.0.2",
+    "@capacitor/share": "^8.0.0"
+  }
+}

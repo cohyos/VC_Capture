@@ -1,6 +1,9 @@
 (function () {
     'use strict';
 
+    // --- Platform detection ---
+    var isNative = typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform();
+
     // --- DOM refs ---
     const apiKeySection = document.getElementById('api-key-section');
     const apiKeyInput = document.getElementById('api-key-input');
@@ -153,6 +156,45 @@
 
     cameraInput.addEventListener('change', handleImageSelect);
     uploadInput.addEventListener('change', handleImageSelect);
+
+    // --- Native Camera (Capacitor) ---
+    if (isNative) {
+        var Camera = window.Capacitor.Plugins.Camera;
+        var CameraSource = { Camera: 'CAMERA', Photos: 'PHOTOS' };
+        var CameraResultType = { Base64: 'base64' };
+
+        // Override click on camera label to use native camera
+        document.getElementById('camera-btn-label').addEventListener('click', function (e) {
+            e.preventDefault();
+            nativeCapture(CameraSource.Camera);
+        });
+
+        // Override click on upload label to use native photo picker
+        document.getElementById('upload-btn-label').addEventListener('click', function (e) {
+            e.preventDefault();
+            nativeCapture(CameraSource.Photos);
+        });
+
+        async function nativeCapture(source) {
+            try {
+                var photo = await Camera.getPhoto({
+                    quality: 85,
+                    allowEditing: false,
+                    resultType: CameraResultType.Base64,
+                    source: source,
+                    width: 1600,
+                    height: 1600,
+                    correctOrientation: true
+                });
+                currentImageBase64 = photo.base64String;
+                currentImageMimeType = 'image/' + (photo.format || 'jpeg');
+                imagePreview.src = 'data:' + currentImageMimeType + ';base64,' + currentImageBase64;
+                previewContainer.classList.remove('hidden');
+            } catch (err) {
+                console.log('Camera cancelled or error:', err);
+            }
+        }
+    }
 
     // --- Gemini API ---
     extractBtn.addEventListener('click', function () {
@@ -385,16 +427,43 @@ Rules:
             .replace(/\n/g, '\\n');
     }
 
-    // --- Download ---
-    downloadVcfBtn.addEventListener('click', function () {
+    // --- Download / Save Contact ---
+    downloadVcfBtn.addEventListener('click', async function () {
         var data = getFormData();
         var vcf = generateVCard(data);
         var filename = [data.firstName, data.lastName].filter(Boolean).join('_') || 'contact';
         filename = filename.replace(/[^a-zA-Z0-9_-]/g, '_') + '.vcf';
 
+        if (isNative) {
+            // On native iOS: write temp file and share it — iOS will show "Add to Contacts"
+            try {
+                var Filesystem = window.Capacitor.Plugins.Filesystem;
+                var Share = window.Capacitor.Plugins.Share;
+
+                var result = await Filesystem.writeFile({
+                    path: filename,
+                    data: btoa(unescape(encodeURIComponent(vcf))),
+                    directory: 'CACHE'
+                });
+
+                await Share.share({
+                    title: 'Add Contact',
+                    url: result.uri,
+                    dialogTitle: 'Save Contact'
+                });
+            } catch (err) {
+                console.error('Native share error:', err);
+                // Fallback to blob download
+                downloadVcfBlob(vcf, filename);
+            }
+        } else {
+            downloadVcfBlob(vcf, filename);
+        }
+    });
+
+    function downloadVcfBlob(vcf, filename) {
         var blob = new Blob([vcf], { type: 'text/vcard;charset=utf-8' });
         var url = URL.createObjectURL(blob);
-
         var a = document.createElement('a');
         a.href = url;
         a.download = filename;
@@ -402,7 +471,7 @@ Rules:
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    });
+    }
 
     // --- Navigation ---
     scanAnotherBtn.addEventListener('click', function () {
