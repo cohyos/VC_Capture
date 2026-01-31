@@ -18,6 +18,13 @@
     const resultsSection = document.getElementById('results-section');
     const noDataSection = document.getElementById('no-data-section');
 
+    const errorSection = document.getElementById('error-section');
+    const errorTitle = document.getElementById('error-title');
+    const errorMessage = document.getElementById('error-message');
+    const errorRetryBtn = document.getElementById('error-retry-btn');
+    const errorBackBtn = document.getElementById('error-back-btn');
+    const loadingText = document.getElementById('loading-text');
+
     const downloadVcfBtn = document.getElementById('download-vcf-btn');
     const scanAnotherBtn = document.getElementById('scan-another-btn');
     const retryBtn = document.getElementById('retry-btn');
@@ -73,6 +80,7 @@
         loadingSection.classList.add('hidden');
         resultsSection.classList.add('hidden');
         noDataSection.classList.add('hidden');
+        errorSection.classList.add('hidden');
 
         if (name === 'capture') {
             captureSection.classList.remove('hidden');
@@ -81,11 +89,20 @@
         } else if (name === 'loading') {
             captureSection.classList.add('hidden');
             loadingSection.classList.remove('hidden');
+            loadingText.textContent = 'Analyzing business card with AI...';
         } else if (name === 'results') {
             resultsSection.classList.remove('hidden');
         } else if (name === 'noData') {
             noDataSection.classList.remove('hidden');
+        } else if (name === 'error') {
+            errorSection.classList.remove('hidden');
         }
+    }
+
+    function showError(title, message) {
+        errorTitle.textContent = title;
+        errorMessage.textContent = message;
+        showSection('error');
     }
 
     // --- Image Handling ---
@@ -143,6 +160,60 @@
         extractCard();
     });
 
+    function sleep(ms) {
+        return new Promise(function (resolve) { setTimeout(resolve, ms); });
+    }
+
+    async function callGeminiWithRetry(apiKey, requestBody, maxRetries) {
+        var delays = [2000, 4000, 8000, 16000];
+        var lastError = null;
+
+        for (var attempt = 0; attempt <= maxRetries; attempt++) {
+            if (attempt > 0) {
+                var waitSec = delays[attempt - 1] / 1000;
+                loadingText.textContent = 'Rate limited. Retrying in ' + waitSec + 's... (attempt ' + (attempt + 1) + '/' + (maxRetries + 1) + ')';
+                await sleep(delays[attempt - 1]);
+                loadingText.textContent = 'Analyzing business card with AI... (attempt ' + (attempt + 1) + '/' + (maxRetries + 1) + ')';
+            }
+
+            var response;
+            try {
+                response = await fetch(
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(apiKey),
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(requestBody)
+                    }
+                );
+            } catch (networkErr) {
+                lastError = { type: 'network', message: networkErr.message };
+                continue;
+            }
+
+            if (response.status === 429) {
+                lastError = { type: 'rate_limit', message: 'Rate limit exceeded (429)' };
+                continue;
+            }
+
+            if (response.status === 400 || response.status === 403) {
+                return { error: true, type: 'auth', message: 'Invalid API key or permission denied. Please check your Gemini API key in Setup.' };
+            }
+
+            if (!response.ok) {
+                return { error: true, type: 'api', message: 'Gemini API returned error ' + response.status + '. Please try again.' };
+            }
+
+            return { error: false, data: await response.json() };
+        }
+
+        // All retries exhausted
+        if (lastError && lastError.type === 'rate_limit') {
+            return { error: true, type: 'rate_limit', message: 'Gemini API rate limit exceeded. The free tier has limited requests per minute. Please wait a moment and try again.' };
+        }
+        return { error: true, type: 'network', message: 'Could not connect to Gemini API after ' + (maxRetries + 1) + ' attempts. Please check your internet connection.' };
+    }
+
     async function extractCard() {
         const apiKey = getApiKey();
         if (!apiKey) {
@@ -180,79 +251,64 @@ Rules:
 - Return ONLY the JSON object, no markdown, no explanation
 - If the image is not a business card or no contact info is found, return exactly: {"error": "no_data"}`;
 
-        try {
-            const response = await fetch(
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(apiKey),
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                {
-                                    inlineData: {
-                                        mimeType: 'image/jpeg',
-                                        data: currentImageBase64
-                                    }
-                                }
-                            ]
-                        }],
-                        generationConfig: {
-                            temperature: 0.1,
-                            maxOutputTokens: 1024
+        var requestBody = {
+            contents: [{
+                parts: [
+                    { text: prompt },
+                    {
+                        inlineData: {
+                            mimeType: 'image/jpeg',
+                            data: currentImageBase64
                         }
-                    })
-                }
-            );
-
-            if (!response.ok) {
-                const errBody = await response.text();
-                console.error('Gemini API error:', response.status, errBody);
-                if (response.status === 400 || response.status === 403) {
-                    alert('Invalid API key or API error. Please check your Gemini API key.');
-                    showSection('capture');
-                    return;
-                }
-                throw new Error('API returned ' + response.status);
+                    }
+                ]
+            }],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 1024
             }
+        };
 
-            const data = await response.json();
+        var result = await callGeminiWithRetry(apiKey, requestBody, 3);
 
-            // Extract the text response
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            console.log('Gemini response:', text);
-
-            // Parse JSON from response (handle markdown code blocks)
-            let parsed;
-            try {
-                let jsonStr = text.trim();
-                // Remove markdown code block wrapping if present
-                if (jsonStr.startsWith('```')) {
-                    jsonStr = jsonStr.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-                }
-                parsed = JSON.parse(jsonStr);
-            } catch (parseErr) {
-                console.error('JSON parse error:', parseErr, 'Raw text:', text);
-                showSection('noData');
-                return;
+        if (result.error) {
+            if (result.type === 'auth') {
+                showError('API Key Error', result.message);
+            } else if (result.type === 'rate_limit') {
+                showError('Rate Limited', result.message);
+            } else {
+                showError('Connection Error', result.message);
             }
-
-            if (parsed.error === 'no_data') {
-                showSection('noData');
-                return;
-            }
-
-            // Populate form
-            populateForm(parsed);
-            loadingSection.classList.add('hidden');
-            resultsSection.classList.remove('hidden');
-
-        } catch (err) {
-            console.error('Extraction error:', err);
-            alert('Error communicating with Gemini API: ' + err.message);
-            showSection('capture');
+            return;
         }
+
+        // Extract the text response
+        const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        console.log('Gemini response:', text);
+
+        // Parse JSON from response (handle markdown code blocks)
+        let parsed;
+        try {
+            let jsonStr = text.trim();
+            if (jsonStr.startsWith('```')) {
+                jsonStr = jsonStr.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            }
+            parsed = JSON.parse(jsonStr);
+        } catch (parseErr) {
+            console.error('JSON parse error:', parseErr, 'Raw text:', text);
+            showSection('noData');
+            return;
+        }
+
+        if (parsed.error === 'no_data') {
+            showSection('noData');
+            return;
+        }
+
+        // Populate form
+        populateForm(parsed);
+        loadingSection.classList.add('hidden');
+        resultsSection.classList.remove('hidden');
     }
 
     // --- Form Handling ---
@@ -355,6 +411,20 @@ Rules:
     });
 
     retryBtn.addEventListener('click', function () {
+        resetInputs();
+        showSection('capture');
+    });
+
+    errorRetryBtn.addEventListener('click', function () {
+        if (currentImageBase64) {
+            extractCard();
+        } else {
+            resetInputs();
+            showSection('capture');
+        }
+    });
+
+    errorBackBtn.addEventListener('click', function () {
         resetInputs();
         showSection('capture');
     });

@@ -60,7 +60,20 @@
         <!-- Loading -->
         <section id="loading-section" class="card hidden">
             <div class="spinner"></div>
-            <p>Analyzing business card with AI...</p>
+            <p id="loading-text">Analyzing business card with AI...</p>
+        </section>
+
+        <!-- Error Section -->
+        <section id="error-section" class="card hidden">
+            <div class="error-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h2 id="error-title">Error</h2>
+            <p id="error-message"></p>
+            <div class="action-buttons" style="margin-top: 16px">
+                <button id="error-retry-btn" class="btn btn-primary btn-large btn-full">Try Again</button>
+                <button id="error-back-btn" class="btn btn-secondary btn-large btn-full">Back</button>
+            </div>
         </section>
 
         <!-- Results Section -->
