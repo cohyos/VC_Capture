@@ -2,7 +2,7 @@
     "name": "VC Capture — Business Card Scanner",
     "short_name": "VC Capture",
     "description": "Scan business cards with AI and save contacts as vCard files",
-    "start_url": "/index.html",
+    "start_url": "./index.html",
     "display": "standalone",
     "background_color": "#0f0f1a",
     "theme_color": "#1a1a2e",

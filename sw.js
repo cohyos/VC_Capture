@@ -1,10 +1,10 @@
-const CACHE_NAME = 'vc-capture-v2';
+const CACHE_NAME = 'vc-capture-v3';
 const ASSETS = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/app.js',
-    '/manifest.json'
+    './',
+    './index.html',
+    './styles.css',
+    './app.js',
+    './manifest.json'
 ];
 
 // Install — cache shell assets
