@@ -317,6 +317,153 @@ textarea {
     display: none !important;
 }
 
+/* User bar */
+#user-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: 0.8rem;
+    flex-wrap: wrap;
+}
+
+#user-email {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+    white-space: nowrap;
+}
+
+#credits-badge {
+    background: var(--primary);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+/* Auth */
+.auth-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.btn-google {
+    background: #fff;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.btn-google:hover {
+    background: #f5f5f5;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 16px 0;
+    gap: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.auth-divider span {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+#email-auth-form .form-group {
+    margin-bottom: 10px;
+}
+
+/* Packs grid */
+.packs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.pack-card {
+    background: var(--bg);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pack-card:active {
+    transform: scale(0.97);
+}
+
+.pack-card:hover {
+    border-color: var(--primary);
+}
+
+.pack-card .pack-scans {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.pack-card .pack-price {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: 4px;
+}
+
+.pack-card .pack-per-scan {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.pack-card.popular {
+    border-color: var(--primary);
+    position: relative;
+}
+
+.pack-card.popular::after {
+    content: 'BEST VALUE';
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.05em;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 6px;

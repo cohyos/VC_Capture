@@ -3,94 +3,195 @@
 
     // --- Platform detection ---
     var isNative = typeof window.Capacitor !== 'undefined' && window.Capacitor.isNativePlatform();
+    var config = window.APP_CONFIG || {};
+    var API_URL = config.apiUrl || '';
+
+    // --- Firebase Init ---
+    firebase.initializeApp(config.firebase);
+    var auth = firebase.auth();
+    var currentUser = null;
+    var userCredits = 0;
 
     // --- DOM refs ---
-    const apiKeySection = document.getElementById('api-key-section');
-    const apiKeyInput = document.getElementById('api-key-input');
-    const saveKeyBtn = document.getElementById('save-key-btn');
-    const keyStatus = document.getElementById('key-status');
+    var authSection = document.getElementById('auth-section');
+    var googleSigninBtn = document.getElementById('google-signin-btn');
+    var emailAuthForm = document.getElementById('email-auth-form');
+    var emailSigninBtn = document.getElementById('email-signin-btn');
+    var emailSignupBtn = document.getElementById('email-signup-btn');
+    var authEmail = document.getElementById('auth-email');
+    var authPassword = document.getElementById('auth-password');
+    var authStatus = document.getElementById('auth-status');
 
-    const captureSection = document.getElementById('capture-section');
-    const cameraInput = document.getElementById('camera-input');
-    const uploadInput = document.getElementById('upload-input');
-    const previewContainer = document.getElementById('preview-container');
-    const imagePreview = document.getElementById('image-preview');
-    const extractBtn = document.getElementById('extract-btn');
+    var userBar = document.getElementById('user-bar');
+    var userEmailEl = document.getElementById('user-email');
+    var creditsBadge = document.getElementById('credits-badge');
+    var signOutBtn = document.getElementById('sign-out-btn');
 
-    const loadingSection = document.getElementById('loading-section');
-    const resultsSection = document.getElementById('results-section');
-    const noDataSection = document.getElementById('no-data-section');
+    var captureSection = document.getElementById('capture-section');
+    var cameraInput = document.getElementById('camera-input');
+    var uploadInput = document.getElementById('upload-input');
+    var previewContainer = document.getElementById('preview-container');
+    var imagePreview = document.getElementById('image-preview');
+    var extractBtn = document.getElementById('extract-btn');
 
-    const errorSection = document.getElementById('error-section');
-    const errorTitle = document.getElementById('error-title');
-    const errorMessage = document.getElementById('error-message');
-    const errorRetryBtn = document.getElementById('error-retry-btn');
-    const errorBackBtn = document.getElementById('error-back-btn');
-    const loadingText = document.getElementById('loading-text');
+    var loadingSection = document.getElementById('loading-section');
+    var loadingText = document.getElementById('loading-text');
+    var resultsSection = document.getElementById('results-section');
+    var noDataSection = document.getElementById('no-data-section');
 
-    const downloadVcfBtn = document.getElementById('download-vcf-btn');
-    const scanAnotherBtn = document.getElementById('scan-another-btn');
-    const retryBtn = document.getElementById('retry-btn');
+    var errorSection = document.getElementById('error-section');
+    var errorTitle = document.getElementById('error-title');
+    var errorMessage = document.getElementById('error-message');
+    var errorRetryBtn = document.getElementById('error-retry-btn');
+    var errorBackBtn = document.getElementById('error-back-btn');
 
-    // Form fields
-    const FIELDS = [
+    var downloadVcfBtn = document.getElementById('download-vcf-btn');
+    var scanAnotherBtn = document.getElementById('scan-another-btn');
+    var retryBtn = document.getElementById('retry-btn');
+
+    var buyCreditsSection = document.getElementById('buy-credits-section');
+    var buyCurrentCredits = document.getElementById('buy-credits-current');
+    var packsContainer = document.getElementById('packs-container');
+    var buyBackBtn = document.getElementById('buy-back-btn');
+
+    var FIELDS = [
         'prefix', 'firstName', 'lastName', 'title', 'company',
         'email', 'phone', 'mobile', 'website', 'address', 'linkedin', 'notes'
     ];
 
-    let currentImageBase64 = null;
-    let currentImageMimeType = null;
+    var currentImageBase64 = null;
+    var currentImageMimeType = null;
 
-    // --- API Key Management ---
-    function getApiKey() {
-        return localStorage.getItem('vc_capture_gemini_key') || '';
+    // --- Auth ---
+    function showAuthStatus(msg, type) {
+        authStatus.textContent = msg;
+        authStatus.className = 'status-msg ' + type;
+        authStatus.classList.remove('hidden');
     }
 
-    function setApiKey(key) {
-        localStorage.setItem('vc_capture_gemini_key', key);
-    }
-
-    function initApiKeyUI() {
-        const key = getApiKey();
-        if (key) {
-            apiKeyInput.value = key;
-            showStatus('API key saved.', 'success');
-            showSection('capture');
+    googleSigninBtn.addEventListener('click', async function () {
+        try {
+            var provider = new firebase.auth.GoogleAuthProvider();
+            await auth.signInWithPopup(provider);
+        } catch (err) {
+            showAuthStatus(err.message, 'error');
         }
-    }
-
-    saveKeyBtn.addEventListener('click', function () {
-        const key = apiKeyInput.value.trim();
-        if (!key) {
-            showStatus('Please enter a valid API key.', 'error');
-            return;
-        }
-        setApiKey(key);
-        showStatus('API key saved.', 'success');
-        showSection('capture');
     });
 
-    function showStatus(msg, type) {
-        keyStatus.textContent = msg;
-        keyStatus.className = 'status-msg ' + type;
-        keyStatus.classList.remove('hidden');
+    emailAuthForm.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var email = authEmail.value.trim();
+        var pass = authPassword.value;
+        try {
+            await auth.signInWithEmailAndPassword(email, pass);
+        } catch (err) {
+            showAuthStatus(err.message, 'error');
+        }
+    });
+
+    emailSignupBtn.addEventListener('click', async function () {
+        var email = authEmail.value.trim();
+        var pass = authPassword.value;
+        if (!email || pass.length < 6) {
+            showAuthStatus('Enter email and password (min 6 characters).', 'error');
+            return;
+        }
+        try {
+            await auth.createUserWithEmailAndPassword(email, pass);
+        } catch (err) {
+            showAuthStatus(err.message, 'error');
+        }
+    });
+
+    signOutBtn.addEventListener('click', function () {
+        auth.signOut();
+    });
+
+    // Auth state listener
+    auth.onAuthStateChanged(async function (user) {
+        currentUser = user;
+        if (user) {
+            userBar.classList.remove('hidden');
+            userEmailEl.textContent = user.email || 'User';
+            authSection.classList.add('hidden');
+            await loadCredits();
+            showSection('capture');
+            checkPaymentReturn();
+        } else {
+            userBar.classList.add('hidden');
+            userCredits = 0;
+            updateCreditsBadge();
+            showSection('auth');
+        }
+    });
+
+    // --- API helpers ---
+    async function getAuthToken() {
+        if (!currentUser) return null;
+        return await currentUser.getIdToken();
     }
+
+    async function apiCall(endpoint, method, body) {
+        var token = await getAuthToken();
+        if (!token) throw new Error('Not authenticated');
+
+        var opts = {
+            method: method,
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json',
+            },
+        };
+        if (body) opts.body = JSON.stringify(body);
+
+        var res = await fetch(API_URL + endpoint, opts);
+        var data = await res.json();
+
+        if (!res.ok) {
+            var err = new Error(data.error || 'API error');
+            err.status = res.status;
+            throw err;
+        }
+        return data;
+    }
+
+    // --- Credits ---
+    async function loadCredits() {
+        try {
+            var data = await apiCall('/api/credits', 'GET');
+            userCredits = data.credits;
+            updateCreditsBadge();
+        } catch (err) {
+            console.error('Load credits error:', err);
+        }
+    }
+
+    function updateCreditsBadge() {
+        creditsBadge.textContent = userCredits + ' credit' + (userCredits !== 1 ? 's' : '');
+    }
+
+    // Click credits badge to open buy credits
+    creditsBadge.addEventListener('click', function () {
+        showBuyCredits();
+    });
 
     // --- Section Visibility ---
     function showSection(name) {
-        apiKeySection.classList.toggle('hidden', name !== 'apiKey');
-        captureSection.classList.toggle('hidden', name !== 'capture' && name !== 'apiKey');
+        authSection.classList.add('hidden');
+        captureSection.classList.add('hidden');
         loadingSection.classList.add('hidden');
         resultsSection.classList.add('hidden');
         noDataSection.classList.add('hidden');
         errorSection.classList.add('hidden');
+        buyCreditsSection.classList.add('hidden');
 
-        if (name === 'capture') {
+        if (name === 'auth') {
+            authSection.classList.remove('hidden');
+        } else if (name === 'capture') {
             captureSection.classList.remove('hidden');
             previewContainer.classList.add('hidden');
             currentImageBase64 = null;
         } else if (name === 'loading') {
-            captureSection.classList.add('hidden');
             loadingSection.classList.remove('hidden');
             loadingText.textContent = 'Analyzing business card with AI...';
         } else if (name === 'results') {
@@ -99,6 +200,8 @@
             noDataSection.classList.remove('hidden');
         } else if (name === 'error') {
             errorSection.classList.remove('hidden');
+        } else if (name === 'buyCredits') {
+            buyCreditsSection.classList.remove('hidden');
         }
     }
 
@@ -110,12 +213,9 @@
 
     // --- Image Handling ---
     function handleImageSelect(e) {
-        const file = e.target.files[0];
+        var file = e.target.files[0];
         if (!file) return;
-
         currentImageMimeType = file.type || 'image/jpeg';
-
-        // Resize the image before converting to base64 to reduce payload
         resizeImage(file, 1600, function (base64) {
             currentImageBase64 = base64;
             imagePreview.src = 'data:' + currentImageMimeType + ';base64,' + base64;
@@ -128,26 +228,15 @@
         reader.onload = function (ev) {
             var img = new Image();
             img.onload = function () {
-                var w = img.width;
-                var h = img.height;
+                var w = img.width, h = img.height;
                 if (w > maxDim || h > maxDim) {
-                    if (w > h) {
-                        h = Math.round(h * maxDim / w);
-                        w = maxDim;
-                    } else {
-                        w = Math.round(w * maxDim / h);
-                        h = maxDim;
-                    }
+                    if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+                    else { w = Math.round(w * maxDim / h); h = maxDim; }
                 }
                 var canvas = document.createElement('canvas');
-                canvas.width = w;
-                canvas.height = h;
-                var ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, w, h);
-                // Get base64 without the data URI prefix
-                var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                var base64 = dataUrl.split(',')[1];
-                callback(base64);
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                callback(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
             };
             img.src = ev.target.result;
         };
@@ -163,13 +252,11 @@
         var CameraSource = { Camera: 'CAMERA', Photos: 'PHOTOS' };
         var CameraResultType = { Base64: 'base64' };
 
-        // Override click on camera label to use native camera
         document.getElementById('camera-btn-label').addEventListener('click', function (e) {
             e.preventDefault();
             nativeCapture(CameraSource.Camera);
         });
 
-        // Override click on upload label to use native photo picker
         document.getElementById('upload-btn-label').addEventListener('click', function (e) {
             e.preventDefault();
             nativeCapture(CameraSource.Photos);
@@ -178,13 +265,9 @@
         async function nativeCapture(source) {
             try {
                 var photo = await Camera.getPhoto({
-                    quality: 85,
-                    allowEditing: false,
+                    quality: 85, allowEditing: false,
                     resultType: CameraResultType.Base64,
-                    source: source,
-                    width: 1600,
-                    height: 1600,
-                    correctOrientation: true
+                    source: source, width: 1600, height: 1600, correctOrientation: true
                 });
                 currentImageBase64 = photo.base64String;
                 currentImageMimeType = 'image/' + (photo.format || 'jpeg');
@@ -196,235 +279,85 @@
         }
     }
 
-    // --- Gemini API ---
+    // --- Extract (server-side) ---
     extractBtn.addEventListener('click', function () {
         if (!currentImageBase64) return;
         extractCard();
     });
 
-    function sleep(ms) {
-        return new Promise(function (resolve) { setTimeout(resolve, ms); });
-    }
-
-    async function callGeminiWithRetry(apiKey, requestBody, maxRetries) {
-        var delays = [2000, 4000, 8000, 16000];
-        var lastError = null;
-
-        for (var attempt = 0; attempt <= maxRetries; attempt++) {
-            if (attempt > 0) {
-                var waitSec = delays[attempt - 1] / 1000;
-                loadingText.textContent = 'Rate limited. Retrying in ' + waitSec + 's... (attempt ' + (attempt + 1) + '/' + (maxRetries + 1) + ')';
-                await sleep(delays[attempt - 1]);
-                loadingText.textContent = 'Analyzing business card with AI... (attempt ' + (attempt + 1) + '/' + (maxRetries + 1) + ')';
-            }
-
-            var response;
-            try {
-                response = await fetch(
-                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(apiKey),
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(requestBody)
-                    }
-                );
-            } catch (networkErr) {
-                lastError = { type: 'network', message: networkErr.message };
-                continue;
-            }
-
-            if (response.status === 429) {
-                lastError = { type: 'rate_limit', message: 'Rate limit exceeded (429)' };
-                continue;
-            }
-
-            if (response.status === 400 || response.status === 403) {
-                return { error: true, type: 'auth', message: 'Invalid API key or permission denied. Please check your Gemini API key in Setup.' };
-            }
-
-            if (!response.ok) {
-                return { error: true, type: 'api', message: 'Gemini API returned error ' + response.status + '. Please try again.' };
-            }
-
-            return { error: false, data: await response.json() };
-        }
-
-        // All retries exhausted
-        if (lastError && lastError.type === 'rate_limit') {
-            return { error: true, type: 'rate_limit', message: 'Gemini API rate limit exceeded. The free tier has limited requests per minute. Please wait a moment and try again.' };
-        }
-        return { error: true, type: 'network', message: 'Could not connect to Gemini API after ' + (maxRetries + 1) + ' attempts. Please check your internet connection.' };
-    }
-
     async function extractCard() {
-        const apiKey = getApiKey();
-        if (!apiKey) {
-            showSection('apiKey');
+        if (userCredits < 1) {
+            showBuyCredits();
             return;
         }
 
         showSection('loading');
 
-        const prompt = `You are a business card data extractor. Analyze this business card image and extract all contact information.
-
-Return ONLY a valid JSON object with these exact keys (use empty string "" if a field is not found):
-{
-  "prefix": "",
-  "firstName": "",
-  "lastName": "",
-  "title": "",
-  "company": "",
-  "email": "",
-  "phone": "",
-  "mobile": "",
-  "website": "",
-  "address": "",
-  "linkedin": "",
-  "notes": ""
-}
-
-Rules:
-- "prefix" is a name prefix like Mr., Mrs., Dr., Prof., etc.
-- "phone" is the landline/office phone number
-- "mobile" is the mobile/cell phone number — if only one phone number exists and it looks like a mobile, put it in "mobile"
-- "address" is the full street address, city, state, zip, country on one line
-- "linkedin" is the LinkedIn profile URL if present
-- "notes" is for any other info on the card that doesn't fit the other fields
-- Return ONLY the JSON object, no markdown, no explanation
-- If the image is not a business card or no contact info is found, return exactly: {"error": "no_data"}`;
-
-        var requestBody = {
-            contents: [{
-                parts: [
-                    { text: prompt },
-                    {
-                        inlineData: {
-                            mimeType: 'image/jpeg',
-                            data: currentImageBase64
-                        }
-                    }
-                ]
-            }],
-            generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 1024
-            }
-        };
-
-        var result = await callGeminiWithRetry(apiKey, requestBody, 3);
-
-        if (result.error) {
-            if (result.type === 'auth') {
-                showError('API Key Error', result.message);
-            } else if (result.type === 'rate_limit') {
-                showError('Rate Limited', result.message);
-            } else {
-                showError('Connection Error', result.message);
-            }
-            return;
-        }
-
-        // Extract the text response
-        const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        console.log('Gemini response:', text);
-
-        // Parse JSON from response (handle markdown code blocks)
-        let parsed;
         try {
-            let jsonStr = text.trim();
-            if (jsonStr.startsWith('```')) {
-                jsonStr = jsonStr.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+            var data = await apiCall('/api/extract', 'POST', { imageBase64: currentImageBase64 });
+
+            if (data.noData) {
+                showSection('noData');
+                return;
             }
-            parsed = JSON.parse(jsonStr);
-        } catch (parseErr) {
-            console.error('JSON parse error:', parseErr, 'Raw text:', text);
-            showSection('noData');
-            return;
-        }
 
-        if (parsed.error === 'no_data') {
-            showSection('noData');
-            return;
-        }
+            if (typeof data.creditsRemaining === 'number') {
+                userCredits = data.creditsRemaining;
+                updateCreditsBadge();
+            }
 
-        // Populate form
-        populateForm(parsed);
-        loadingSection.classList.add('hidden');
-        resultsSection.classList.remove('hidden');
+            populateForm(data.result);
+            showSection('results');
+        } catch (err) {
+            if (err.status === 402) {
+                showBuyCredits();
+            } else if (err.status === 401) {
+                showError('Session Expired', 'Please sign in again.');
+            } else {
+                showError('Extraction Error', err.message || 'Could not extract card details.');
+            }
+        }
     }
 
     // --- Form Handling ---
     function populateForm(data) {
-        FIELDS.forEach(function (field) {
-            var el = document.getElementById('field-' + field);
-            if (el) {
-                el.value = data[field] || '';
-            }
+        FIELDS.forEach(function (f) {
+            var el = document.getElementById('field-' + f);
+            if (el) el.value = (data && data[f]) || '';
         });
     }
 
     function getFormData() {
         var data = {};
-        FIELDS.forEach(function (field) {
-            var el = document.getElementById('field-' + field);
-            if (el) {
-                data[field] = el.value.trim();
-            }
+        FIELDS.forEach(function (f) {
+            var el = document.getElementById('field-' + f);
+            if (el) data[f] = el.value.trim();
         });
         return data;
     }
 
     // --- vCard Generation ---
     function generateVCard(data) {
-        var lines = [];
-        lines.push('BEGIN:VCARD');
-        lines.push('VERSION:3.0');
-
-        // Full name
+        var lines = ['BEGIN:VCARD', 'VERSION:3.0'];
         var fullName = [data.prefix, data.firstName, data.lastName].filter(Boolean).join(' ');
-        lines.push('FN:' + escVCard(fullName));
-        lines.push('N:' + escVCard(data.lastName) + ';' + escVCard(data.firstName) + ';;' + escVCard(data.prefix) + ';');
-
-        if (data.company) {
-            lines.push('ORG:' + escVCard(data.company));
-        }
-        if (data.title) {
-            lines.push('TITLE:' + escVCard(data.title));
-        }
-        if (data.email) {
-            lines.push('EMAIL;TYPE=INTERNET;TYPE=WORK:' + escVCard(data.email));
-        }
-        if (data.phone) {
-            lines.push('TEL;TYPE=WORK,VOICE:' + escVCard(data.phone));
-        }
-        if (data.mobile) {
-            lines.push('TEL;TYPE=CELL,VOICE:' + escVCard(data.mobile));
-        }
-        if (data.website) {
-            lines.push('URL:' + escVCard(data.website));
-        }
-        if (data.address) {
-            // Put full address in the street field of ADR for maximum compatibility
-            lines.push('ADR;TYPE=WORK:;;' + escVCard(data.address) + ';;;;');
-        }
-        if (data.linkedin) {
-            lines.push('X-SOCIALPROFILE;TYPE=linkedin:' + escVCard(data.linkedin));
-        }
-        if (data.notes) {
-            lines.push('NOTE:' + escVCard(data.notes));
-        }
-
+        lines.push('FN:' + esc(fullName));
+        lines.push('N:' + esc(data.lastName) + ';' + esc(data.firstName) + ';;' + esc(data.prefix) + ';');
+        if (data.company) lines.push('ORG:' + esc(data.company));
+        if (data.title) lines.push('TITLE:' + esc(data.title));
+        if (data.email) lines.push('EMAIL;TYPE=INTERNET;TYPE=WORK:' + esc(data.email));
+        if (data.phone) lines.push('TEL;TYPE=WORK,VOICE:' + esc(data.phone));
+        if (data.mobile) lines.push('TEL;TYPE=CELL,VOICE:' + esc(data.mobile));
+        if (data.website) lines.push('URL:' + esc(data.website));
+        if (data.address) lines.push('ADR;TYPE=WORK:;;' + esc(data.address) + ';;;;');
+        if (data.linkedin) lines.push('X-SOCIALPROFILE;TYPE=linkedin:' + esc(data.linkedin));
+        if (data.notes) lines.push('NOTE:' + esc(data.notes));
         lines.push('END:VCARD');
         return lines.join('\r\n');
     }
 
-    function escVCard(str) {
+    function esc(str) {
         if (!str) return '';
-        return str
-            .replace(/\\/g, '\\\\')
-            .replace(/;/g, '\\;')
-            .replace(/,/g, '\\,')
-            .replace(/\n/g, '\\n');
+        return str.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
     }
 
     // --- Download / Save Contact ---
@@ -435,25 +368,17 @@ Rules:
         filename = filename.replace(/[^a-zA-Z0-9_-]/g, '_') + '.vcf';
 
         if (isNative) {
-            // On native iOS: write temp file and share it — iOS will show "Add to Contacts"
             try {
                 var Filesystem = window.Capacitor.Plugins.Filesystem;
                 var Share = window.Capacitor.Plugins.Share;
-
                 var result = await Filesystem.writeFile({
                     path: filename,
                     data: btoa(unescape(encodeURIComponent(vcf))),
                     directory: 'CACHE'
                 });
-
-                await Share.share({
-                    title: 'Add Contact',
-                    url: result.uri,
-                    dialogTitle: 'Save Contact'
-                });
+                await Share.share({ title: 'Add Contact', url: result.uri, dialogTitle: 'Save Contact' });
             } catch (err) {
                 console.error('Native share error:', err);
-                // Fallback to blob download
                 downloadVcfBlob(vcf, filename);
             }
         } else {
@@ -465,12 +390,81 @@ Rules:
         var blob = new Blob([vcf], { type: 'text/vcard;charset=utf-8' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    // --- Buy Credits ---
+    async function showBuyCredits() {
+        buyCurrentCredits.textContent = userCredits;
+
+        try {
+            var data = await apiCall('/api/credits', 'GET');
+            userCredits = data.credits;
+            updateCreditsBadge();
+            buyCurrentCredits.textContent = data.credits;
+            renderPacks(data.packs);
+        } catch (err) {
+            // Use default packs if API fails
+            renderPacks([
+                { id: 'pack_10', scans: 10, price: 300, label: '10 Scans', priceLabel: '$3.00' },
+                { id: 'pack_25', scans: 25, price: 600, label: '25 Scans', priceLabel: '$6.00' },
+                { id: 'pack_50', scans: 50, price: 1000, label: '50 Scans', priceLabel: '$10.00' },
+                { id: 'pack_100', scans: 100, price: 1500, label: '100 Scans', priceLabel: '$15.00' },
+            ]);
+        }
+
+        showSection('buyCredits');
+    }
+
+    function renderPacks(packs) {
+        packsContainer.innerHTML = '';
+        packs.forEach(function (pack, i) {
+            var perScan = (pack.price / 100 / pack.scans).toFixed(2);
+            var div = document.createElement('div');
+            div.className = 'pack-card' + (i === packs.length - 1 ? ' popular' : '');
+            div.innerHTML =
+                '<div class="pack-scans">' + pack.label + '</div>' +
+                '<div class="pack-price">' + pack.priceLabel + '</div>' +
+                '<div class="pack-per-scan">$' + perScan + '/scan</div>';
+            div.addEventListener('click', function () {
+                purchasePack(pack.id);
+            });
+            packsContainer.appendChild(div);
+        });
+    }
+
+    async function purchasePack(packId) {
+        try {
+            var data = await apiCall('/api/checkout', 'POST', { packId: packId });
+            if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch (err) {
+            showError('Payment Error', err.message || 'Could not start checkout.');
+        }
+    }
+
+    buyBackBtn.addEventListener('click', function () {
+        showSection('capture');
+    });
+
+    // --- Check for payment return ---
+    function checkPaymentReturn() {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('payment') === 'success') {
+            // Reload credits after successful payment
+            setTimeout(async function () {
+                await loadCredits();
+                showSection('capture');
+            }, 1000);
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (params.get('payment') === 'cancelled') {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
     }
 
     // --- Navigation ---
@@ -503,12 +497,9 @@ Rules:
         uploadInput.value = '';
         previewContainer.classList.add('hidden');
         currentImageBase64 = null;
-        FIELDS.forEach(function (field) {
-            var el = document.getElementById('field-' + field);
+        FIELDS.forEach(function (f) {
+            var el = document.getElementById('field-' + f);
             if (el) el.value = '';
         });
     }
-
-    // --- Init ---
-    initApiKeyUI();
 })();
